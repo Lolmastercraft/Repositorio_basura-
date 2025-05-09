@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Crear Cuenta</title>
+  <link rel="stylesheet" href="css/register.css" />
+</head>
+<body>
+  <main class="register-container">
+    <form class="register-form">
+      <h1>Crear Cuenta</h1>
+
+      <label>
+        Nombre de usuario
+        <input type="text" name="username" placeholder="Tu nombre" required />
+      </label>
+
+      <label>
+        Correo electrónico
+        <input type="email" name="email" placeholder="tucorreo@ejemplo.com" required />
+      </label>
+
+      <label>
+        Contraseña
+        <input type="password" name="password" placeholder="••••••••" required />
+      </label>
+
+      <button type="submit">Registrarme</button>
+      <p>¿Ya tienes cuenta? <a href="login.html">Inicia Sesión</a></p>
+    </form>
+  </main>
+
+  <!-- Toast container -->
+  <div id="toast-box"></div>
+
+  <script type="module">
+    import { toast } from './js/toast.js';
+
+    const form = document.querySelector('.register-form');
+
+    form.addEventListener('submit', async e => {
+      e.preventDefault();
+
+      const data = {
+        username: form.username.value.trim(),
+        email   : form.email.value.trim().toLowerCase(),
+        password: form.password.value
+      };
+
+      const res = await fetch('/api/users', {
+        method : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body   : JSON.stringify(data)
+      }).then(r => r.json());
+
+      toast(res.message || res.error, !!res.error);
+
+      if (!res.error) {
+        /* redirige al login tras registrar */
+        setTimeout(() => location.href = 'login.html', 1200);
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+# --- Core ---
+Flask==3.0.2
+gunicorn==22.0.0
+
+# --- AWS ---
+boto3==1.38.11
+python-dotenv==1.0.1

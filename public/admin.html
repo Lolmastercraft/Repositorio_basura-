@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Panel de Administración</title>
+  <link rel="stylesheet" href="css/admin.css" />
+</head>
+<body>
+  <header>
+    <h1>👑 Panel Admin</h1>
+    <nav>
+      <a href="index.html">Tienda</a>
+      <a href="carrito.html">Carrito</a>
+      <a href="admin.html">Admin</a>
+      <a href="#" id="salir">Cerrar Sesión</a>
+    </nav>
+  </header>
+
+  <main>
+    <!-- ===== Acciones rápidas ===== -->
+    <section class="admin-panel">
+      <h2>Acciones de Administrador</h2>
+      <div class="actions">
+        <a href="#alta-producto">Crear Producto</a>
+        <a href="#inventario">Inventario</a>
+        <a href="#usuarios">Usuarios</a>
+        <a href="#pedidos">Pedidos</a>
+      </div>
+    </section>
+
+    <!-- ===== Alta de producto ===== -->
+    <section id="alta-producto" class="admin-panel">
+      <h2>Crear Nuevo Vinilo</h2>
+      <form id="add-form" class="add-form">
+        <input name="product_id" placeholder="ID" required />
+        <input name="title" placeholder="Título" required />
+        <input name="price" type="number" step="0.01" placeholder="Precio" required />
+        <input name="stock" type="number" placeholder="Stock" required />
+        <input name="img" placeholder="URL imagen (opcional)" />
+        <button type="submit">Crear</button>
+      </form>
+    </section>
+
+    <!-- ===== Inventario ===== -->
+    <section id="inventario" class="admin-panel">
+      <h2>Productos en tienda</h2>
+      <table id="prod-table">
+        <thead><tr><th>ID</th><th>Título</th><th>Stock</th><th>Precio</th><th>Acciones</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </section>
+
+    <!-- ===== Gestión de usuarios ===== -->
+    <section id="usuarios" class="admin-panel">
+      <h2>Gestión de Usuarios</h2>
+      <table id="users-table">
+        <thead><tr><th>Email</th><th>Usuario</th><th>Acciones</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </section>
+
+    <!-- ===== Pedidos ===== -->
+    <section id="pedidos" class="admin-panel">
+      <h2>Pedidos realizados</h2>
+      <table id="ord-table">
+        <thead><tr><th>#Orden</th><th>Usuario</th><th>Total</th><th>Ítems</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </section>
+  </main>
+
+  <footer><p>&copy; 2025 Vinilos Clásicos</p></footer>
+
+  <!-- Toast container -->
+  <div id="toast-box"></div>
+
+  <!-- ========== Scripts ========== -->
+  <script type="module">
+    import { API }   from './js/api.js';
+    import { toast } from './js/toast.js';
+
+    /* ---------- Protección ---------- */
+    const me = await API.me();
+    if (!me.is_admin) {
+      toast('Necesitas privilegios de administrador', true);
+      location.href = 'login.html';
+    }
+
+    /* ---------- Logout ---------- */
+    document.getElementById('salir').addEventListener('click', async e => {
+      e.preventDefault();
+      await API.logout();
+      location.href = 'login.html';
+    });
+
+    /* ---------- Alta de producto ---------- */
+    document.getElementById('add-form').addEventListener('submit', async e => {
+      e.preventDefault();
+      const datos = Object.fromEntries(new FormData(e.target).entries());
+      const res   = await API.createProduct(datos);
+      toast(res.message || res.error, !!res.error);
+      if (!res.error) {
+        e.target.reset();
+        loadProducts();
+      }
+    });
+
+    /* ---------- Inventario ---------- */
+    const prodBody = document.querySelector('#prod-table tbody');
+    async function loadProducts() {
+      const list = await API.listProducts();
+      prodBody.innerHTML = list.map(p => `
+        <tr data-id="${p.product_id}">
+          <td>${p.product_id}</td>
+          <td>${p.title}</td>
+          <td>${p.stock}</td>
+          <td>$${p.price}</td>
+          <td>
+            <button class="edit-prod">✏️</button>
+            <button class="del-prod">🗑️</button>
+          </td>
+        </tr>`).join('');
+    }
+    prodBody.addEventListener('click', async e => {
+      const row = e.target.closest('tr');
+      if (!row) return;
+      const pid = row.dataset.id;
+
+      if (e.target.classList.contains('edit-prod')) {
+        const stock = prompt('Nuevo stock:', row.children[2].textContent);
+        if (!stock) return;
+        const res = await API.updateProduct(pid, { stock: Number(stock) });
+        toast(res.message || res.error, !!res.error);
+        loadProducts();
+      }
+      if (e.target.classList.contains('del-prod') &&
+          confirm('¿Eliminar producto?')) {
+        const res = await API.deleteProduct(pid);
+        toast(res.message || res.error, !!res.error);
+        loadProducts();
+      }
+    });
+
+    /* ---------- Usuarios ---------- */
+    const userBody = document.querySelector('#users-table tbody');
+    async function loadUsers() {
+      const users = await API.listUsers();
+      userBody.innerHTML = users.map(u => `
+        <tr data-id="${u.user_id}">
+          <td>${u.email ?? '—'}</td>
+          <td>${u.username}</td>
+          <td>
+            <button class="edit-user">✏️</button>
+            <button class="del-user">🗑️</button>
+          </td>
+        </tr>`).join('');
+    }
+    userBody.addEventListener('click', async e => {
+      const row = e.target.closest('tr');
+      if (!row) return;
+      const uid = row.dataset.id;
+
+      if (e.target.classList.contains('edit-user')) {
+        const nuevoNombre = prompt('Nuevo nombre de usuario:',
+                                   row.children[1].textContent);
+        const nuevoMail   = prompt('Nuevo correo electrónico:',
+                                   row.children[0].textContent);
+        if (!nuevoNombre || !nuevoMail) return;
+        const res = await API.updateUser(uid, {
+          username: nuevoNombre.trim(),
+          email:    nuevoMail.trim().toLowerCase()
+        });
+        toast(res.message || res.error, !!res.error);
+        loadUsers();
+      }
+
+      if (e.target.classList.contains('del-user') &&
+          confirm('¿Eliminar usuario definitivamente?')) {
+        const res = await API.deleteUser(uid);
+        toast(res.message || res.error, !!res.error);
+        loadUsers();
+      }
+    });
+
+    /* ---------- Pedidos ---------- */
+    const ordBody = document.querySelector('#ord-table tbody');
+    async function loadOrders() {
+      const ords = await API.listOrders();
+      ordBody.innerHTML = ords.map(o => `
+        <tr>
+          <td>${o.order_id.slice(0, 8)}…</td>
+          <td>${o.user_id}</td>
+          <td>$${o.total}</td>
+          <td>${o.items.length}</td>
+        </tr>`).join('');
+    }
+
+    /* ---------- Inicial ---------- */
+    loadProducts();
+    loadUsers();
+    loadOrders();
+  </script>
+</body>
+</html>

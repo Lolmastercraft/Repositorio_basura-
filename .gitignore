@@ -1,0 +1,11 @@
+pycache/
+*.py[cod]
+*$py.class
+venv/
+.env
+.env.*
+.aws/
+credentials
+.pytest_cache/
+.cache/
+*.env

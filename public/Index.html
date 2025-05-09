@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>Vinilos Clásicos</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header>
+  <h1>Colección de Discos de Vinilo</h1>
+  <nav><a href="carrito.html">Ver Carrito</a></nav>
+</header>
+
+<main>
+  <section id="vinyl-list" class="vinyl-list"></section>
+</main>
+
+<footer><p>&copy; 2025 Vinilos Clásicos</p></footer>
+
+<!-- Toast container -->
+<div id="toast-box"></div>
+
+<!-- Catálogo -->
+<script type="module">
+  import { API   } from './js/api.js';
+  import { toast } from './js/toast.js';
+
+  const cont = document.getElementById('vinyl-list');
+
+  async function renderCatalog() {
+    const productos = await API.listProducts();
+
+    cont.innerHTML = productos.map(p => `
+      <article class="vinyl-item" data-id="${p.product_id}">
+        <img src="${p.img ?? 'https://via.placeholder.com/250'}" alt="${p.title}">
+        <h2>${p.title} – $${p.price}</h2>
+        <button class="add-to-cart"
+                ${p.stock === 0 ? 'disabled' : ''}>
+          ${p.stock === 0 ? 'Sin stock' : 'Agregar al carrito'}
+        </button>
+      </article>
+    `).join('');
+
+    cont.querySelectorAll('.add-to-cart').forEach(btn =>
+      btn.addEventListener('click', async e => {
+        const id  = e.target.closest('.vinyl-item').dataset.id;
+        const res = await API.addToCart(id, 1);
+        toast(res.message || res.error, !!res.error);
+        if (!res.error) renderCatalog();   // refresca stock
+      }));
+  }
+
+  renderCatalog();
+</script>
+</body>
+</html>

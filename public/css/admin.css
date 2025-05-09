@@ -1,0 +1,197 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap');
+
+:root {
+  --bg: #181818;
+  --surface: #242424;
+  --accent: #d4af37;
+  --hover: #c39f2b;
+  --text: #fff;
+  --secondary: #bbbbbb;
+  --trans: 0.3s;
+}
+
+*{margin:0;padding:0;box-sizing:border-box}
+
+body{
+  font-family:'Poppins',sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  min-height:100vh;
+}
+
+header{
+  background:var(--surface);
+  padding:1rem 2rem;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  border-bottom:3px solid var(--accent);
+}
+header h1{color:var(--accent)}
+header nav a{
+  margin-left:1rem;
+  color:var(--secondary);
+  text-decoration:none;
+  font-weight:500;
+  transition:color var(--trans);
+}
+header nav a:hover{color:var(--accent)}
+
+main{padding:2rem;}
+
+.admin-panel{
+  background:var(--surface);
+  padding:2rem;
+  border-radius:12px;
+  box-shadow:0 4px 8px rgba(0,0,0,0.5);
+  margin-block:3rem;
+  padding-block:0.5rem 1rem;
+  border-top:2px solid var(--accent);
+}
+.admin-panel h2{margin-bottom:0.3rem;color:var(--accent)}
+
+.actions{
+  display:flex;
+  flex-wrap:wrap;
+  gap:1rem;
+}
+.actions a{
+  background:var(--accent);
+  padding:0.75rem 1.5rem;
+  border-radius:8px;
+  text-decoration:none;
+  color:var(--bg);
+  font-weight:600;
+  transition:background var(--trans),transform var(--trans);
+}
+.actions a:hover{
+  background:var(--hover);
+  transform:translateY(-2px);
+}
+
+footer{
+  text-align:center;
+  padding:1rem;
+  background:var(--surface);
+  border-top:3px solid var(--accent);
+  margin-top:2rem;
+}
+
+/* === Tablas ===================================================== */
+.admin-panel table{
+  width:100%;
+  border-collapse:collapse;
+  font-size:0.95rem;
+  margin-top:0.75rem;
+}
+.admin-panel th,
+.admin-panel td{
+  padding:0.6rem 0.9rem;
+  text-align:left;
+}
+.admin-panel thead th{
+  color:var(--accent);
+  font-weight:600;
+  border-bottom:2px solid var(--accent);
+}
+.admin-panel tbody tr:nth-child(odd){
+  background-color:rgba(255,255,255,0.035);
+}
+.admin-panel tbody tr:hover{
+  background-color:rgba(255,255,255,0.08);
+}
+/* Anchura fija primera columna */
+#ord-table td:first-child,
+#prod-table td:first-child{
+  width:6rem;
+  font-family:monospace;
+}
+
+/* === Botones acción ============================================ */
+.admin-panel button{
+  border:none;
+  background:var(--accent);
+  color:var(--bg);
+  width:1.9rem;
+  height:1.9rem;
+  margin-inline:0.15rem;
+  border-radius:4px;
+  cursor:pointer;
+  transition:background-color 0.2s,transform 0.15s;
+}
+.admin-panel button:hover{
+  background:var(--hover);
+  transform:translateY(-2px);
+}
+.admin-panel button:active{transform:translateY(0)}
+.admin-panel button::before{display:inline-block;transform:translateY(-1px)}
+
+/* === Alta de producto – formulario ============================= */
+#alta-producto .add-form{
+  display:flex;
+  flex-wrap:wrap;
+  gap:0.8rem;
+  align-items:center;
+  padding:0.8rem 1rem;
+  background:rgba(255,255,255,0.03);
+  border-radius:1rem;
+  overflow:visible;
+}
+#alta-producto .add-form input{
+  flex:1 1 9rem;
+  padding:0.55rem 0.8rem;
+  font-size:0.95rem;
+  color:var(--text);
+  background:#1d1d1d;
+  border:1px solid #444;
+  border-radius:6px;
+  transition:border-color 0.2s;
+}
+#alta-producto .add-form input:focus{
+  outline:none;
+  border-color:var(--accent);
+}
+#alta-producto .add-form button{
+  flex:0 0 auto;
+  padding:0.6rem 1.4rem;
+  font-weight:600;
+  background:var(--accent);
+  color:var(--bg);
+  border:none;
+  border-radius:8px;
+  cursor:pointer;
+  transition:background 0.2s,transform 0.15s;
+}
+#alta-producto .add-form button:hover{
+  background:var(--hover);
+  transform:translateY(-2px);
+}
+#alta-producto .add-form button:active{transform:translateY(0)}
+
+/* === Toasts ==================================================== */
+#toast-box{
+  position:fixed;
+  top:1.2rem;
+  right:1.2rem;
+  z-index:9999;
+  display:flex;
+  flex-direction:column;
+  gap:0.6rem;
+}
+.toast{
+  min-width:220px;
+  max-width:260px;
+  padding:0.8rem 1.1rem;
+  border-radius:8px;
+  font-size:0.9rem;
+  color:var(--bg);
+  background:var(--accent);
+  box-shadow:0 4px 10px rgba(0,0,0,0.45);
+  animation:fadein 0.25s ease,fadeout 0.35s ease 2.8s forwards;
+}
+.toast.error{
+  background:#d23a3a;
+  color:#fff;
+}
+@keyframes fadein  {from{opacity:0;transform:translateY(-8px)} to{opacity:1}}
+@keyframes fadeout {to  {opacity:0;transform:translateY(-8px)}}
