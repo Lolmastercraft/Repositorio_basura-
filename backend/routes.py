@@ -1,182 +1,173 @@
-# backend/routes.py
-import os
-import uuid
+"""
+routes.py  – Blueprint con endpoints REST
+"""
 
-from flask import Blueprint, request, jsonify, session
+from __future__ import annotations
+from functools import wraps
+from flask import Blueprint, request, jsonify, session, abort
+from werkzeug.security import generate_password_hash, check_password_hash
 import models
-from models import get_user_by_email
 
-api = Blueprint("api", __name__, url_prefix="/api")
+api = Blueprint("api", __name__)
 
-# =====================================================
-#                    AUTENTICACIÓN
-# =====================================================
-@api.route("/login", methods=["POST"])
+# ---------------------------------------------------------------------------
+# 1. DECORADOR: login_required_active
+# ---------------------------------------------------------------------------
+def login_required_active(fn):
+    """
+    Verifica que session['user_id'] exista y que el usuario siga presente en DynamoDB.
+    Aborta con 401 si no es válido.
+    """
+    @wraps(fn)
+    def _wrapper(*args, **kwargs):
+        user_id = session.get("user_id")
+        if not user_id or not models.user_exists(user_id):
+            abort(401, description="Sesión inválida o usuario eliminado")
+        return fn(*args, **kwargs)
+    return _wrapper
+
+
+# ---------------------------------------------------------------------------
+# 2. NUEVO ENDPOINT  /api/me   (lo pidió el front)
+# ---------------------------------------------------------------------------
+@api.route("/api/me", methods=["GET"])
+def who_am_i():
+    """
+    Devuelve información básica de la sesión actual:
+        { "user_id": "<uuid>|None", "is_admin": true|false }
+    Si no hay sesión válida → devuelve user_id: None.
+    """
+    uid = session.get("user_id")
+    if not uid or not models.user_exists(uid):
+        return jsonify({"user_id": None, "is_admin": False}), 200
+
+    usr = models.get_user(uid)
+    return jsonify({"user_id": uid, "is_admin": usr.get("role") == "admin"}), 200
+
+
+# ---------------------------------------------------------------------------
+# 3. AUTENTICACIÓN
+# ---------------------------------------------------------------------------
+@api.route("/api/register", methods=["POST"])
+def register():
+    data = request.json or {}
+    if not data.get("username") or not data.get("password"):
+        abort(400, description="username y password requeridos")
+    if models.get_user_by_username(data["username"]):
+        abort(409, description="Usuario ya existe")
+    user = models.create_user(
+        username=data["username"],
+        password=generate_password_hash(data["password"])
+    )
+    return jsonify(user), 201
+
+
+@api.route("/api/login", methods=["POST"])
 def login():
-    data  = request.get_json()
-    email = data["email"].lower()
-    pwd   = data["password"]
-
-    # --- Admin ---
-    if (email == os.getenv("ADMIN_EMAIL", "").lower() and
-            pwd == os.getenv("ADMIN_PASS", "")):
-        session.permanent = True
-        session["user"] = {
-            "user_id" : None,
-            "email"   : email,
-            "is_admin": True
-        }
-        return jsonify({"message": "Admin OK", "is_admin": True})
-
-    # --- Usuario normal ---
-    if not models.verify_user(email, pwd):
-        return jsonify({"error": "Credenciales inválidas"}), 401
-
-    # Obtener user_id real y guardarlo en sesión
-    user_item = get_user_by_email(email)
-    session.permanent = True
-    session["user"] = {
-        "user_id" : user_item["user_id"],
-        "email"   : email,
-        "is_admin": False
-    }
-    return jsonify({"message": "Login OK", "is_admin": False})
+    data = request.json or {}
+    user = models.get_user_by_username(data.get("username", ""))
+    if not user or not check_password_hash(user["password"], data.get("password", "")):
+        abort(401, description="Credenciales incorrectas")
+    session["user_id"] = user["id"]
+    return jsonify({"msg": "login ok"}), 200
 
 
-@api.route("/logout")
+@api.route("/api/logout", methods=["POST"])
+@login_required_active
 def logout():
     session.clear()
-    return jsonify({"message": "Bye"})
+    return jsonify({"msg": "logout ok"}), 200
 
 
-@api.route("/me")
-def me():
-    return jsonify(session.get("user") or {})
-
-
-# =====================================================
-#                     USUARIOS
-# =====================================================
-@api.route("/users", methods=["GET"])
-def list_users():
-    return jsonify(models.list_users())
-
-
-@api.route("/users", methods=["POST"])
-def registrar_usuario():
-    data  = request.get_json()
-    email = data["email"].lower()
-
-    # Validar duplicados
-    if get_user_by_email(email):
-        return jsonify({"error": "El correo ya está registrado"}), 400
-
-    user_id = str(uuid.uuid4())
-    models.create_user(
-        user_id,
-        data["username"],
-        email,
-        data["password"]
-    )
-    return jsonify({"message": "Usuario creado", "user_id": user_id}), 201
-
-
-@api.route("/users/<user_id>", methods=["PUT", "DELETE"])
-def usuario_crud(user_id):
-    if request.method == "PUT":
-        models.update_user(user_id, **request.get_json())
-        return jsonify({"message": "Actualizado"})
+# ---------------------------------------------------------------------------
+# 4. USUARIOS
+# ---------------------------------------------------------------------------
+@api.route("/api/users/<user_id>", methods=["DELETE"])
+@login_required_active
+def delete_user(user_id):
     models.delete_user(user_id)
-    return jsonify({"message": "Eliminado"})
+    # si es su propia sesión, limpiar cookie
+    if session.get("user_id") == user_id:
+        session.clear()
+    return jsonify({"msg": "Usuario eliminado"}), 200
 
 
-# =====================================================
-#                     PRODUCTOS
-# =====================================================
-@api.route("/products", methods=["GET"])
-def listar_productos():
-    return jsonify(models.list_products())
+# ---------------------------------------------------------------------------
+# 5. PRODUCTOS
+# ---------------------------------------------------------------------------
+@api.route("/api/products", methods=["GET"])
+def products_list():
+    return jsonify(models.list_products()), 200
 
 
-@api.route("/products", methods=["POST"])
-def crear_producto():
-    if not session.get("user", {}).get("is_admin"):
-        return jsonify({"error": "No autorizado"}), 403
-    data = request.get_json()
-    models.create_product(
-        data["product_id"],
-        data["title"],
-        float(data["price"]),
-        int(data["stock"]),
-        data.get("img")
+@api.route("/api/products", methods=["POST"])
+@login_required_active
+def products_create():
+    data = request.json or {}
+    product = models.create_product(
+        name=data.get("name", ""),
+        price=float(data.get("price", 0)),
+        stock=int(data.get("stock", 0))
     )
-    return jsonify({"message": "Producto creado"}), 201
+    return jsonify(product), 201
 
 
-@api.route("/products/<product_id>", methods=["PUT", "DELETE"])
-def producto_edit(product_id):
-    if not session.get("user", {}).get("is_admin"):
-        return jsonify({"error": "No autorizado"}), 403
-    if request.method == "PUT":
-        models.update_product(product_id, **request.get_json())
-        return jsonify({"message": "Actualizado"})
-    models.delete_product(product_id)
-    return jsonify({"message": "Eliminado"})
+@api.route("/api/products/<product_id>", methods=["PATCH"])
+@login_required_active
+def products_update(product_id):
+    data = request.json or {}
+    product = models.update_product(product_id, data)
+    return jsonify(product), 200
 
 
-# =====================================================
-#                       CARRITO
-# =====================================================
-@api.route("/cart", methods=["GET", "POST"])
-def carrito():
-    if request.method == "GET":
-        return jsonify(models.list_cart(session.get("user", {}).get("user_id", "guest")))
-    data   = request.get_json()
-    user_id = session.get("user", {}).get("user_id", "guest")
-    res    = models.add_to_cart(data["product_id"], data.get("qty", 1), user_id)
-    status = 400 if "error" in res else 201
-    return jsonify(res), status
+# ---------------------------------------------------------------------------
+# 6. CARRITO
+# ---------------------------------------------------------------------------
+@api.route("/api/cart", methods=["GET"])
+@login_required_active
+def cart_list():
+    return jsonify(models.list_cart(session["user_id"])), 200
 
 
-@api.route("/cart/<product_id>", methods=["DELETE"])
-def eliminar_del_carrito(product_id):
-    user_id = session.get("user", {}).get("user_id", "guest")
-    return jsonify(models.remove_from_cart(product_id, user_id))
+@api.route("/api/cart", methods=["POST"])
+@login_required_active
+def cart_add():
+    data = request.json or {}
+    item = models.add_to_cart(
+        user_id=session["user_id"],
+        product_id=data.get("product_id"),
+        quantity=int(data.get("quantity", 1))
+    )
+    return jsonify(item), 201
 
 
-# =====================================================
-#                       CHECKOUT
-# =====================================================
-@api.route("/checkout", methods=["POST"])
-def realizar_compra():
-    user = session.get("user")
-    if not user:
-        return jsonify({"error": "No autenticado"}), 401
+@api.route("/api/cart/checkout", methods=["POST"])
+@login_required_active
+def cart_checkout():
+    uid = session["user_id"]
+    cart_items = models.list_cart(uid)
+    if not cart_items:
+        abort(400, description="Carrito vacío")
 
-    uid = user.get("user_id") or user.get("email")
-    res = models.checkout(user_id=uid)
-    status = 400 if "error" in res else 201
-    return jsonify(res), status
+    total = sum(i["quantity"] * models.get_product(i["product_id"])["price"]
+                for i in cart_items)
+    order = models.create_order(uid, cart_items, total)
+    return jsonify(order), 201
 
 
-# =====================================================
-#                       ORDENES
-# =====================================================
-@api.route("/orders")
-def orders():
-    if not session.get("user", {}).get("is_admin"):
-        return jsonify({"error": "No autorizado"}), 403
+# ---------------------------------------------------------------------------
+# 7. ÓRDENES
+# ---------------------------------------------------------------------------
+@api.route("/api/orders", methods=["GET"])
+@login_required_active
+def orders_list():
+    return jsonify(models.list_orders(session["user_id"])), 200
 
-    # Enriquecer con username
-    raw = models.list_orders()
-    enriched = []
-    for o in raw:
-        user_item = models.users_table.get_item(Key={"user_id": o["user_id"]}).get("Item")
-        enriched.append({
-            "order_id": o["order_id"],
-            "user_id" : o["user_id"],
-            "username": (user_item["username"] if user_item else o["user_id"]),
-            "total"   : o["total"],
-            "items"   : o["items"]
-        })
-    return jsonify(enriched)
+
+# ---------------------------------------------------------------------------
+# 8. PANEL ADMIN (opcional)
+# ---------------------------------------------------------------------------
+@api.route("/admin", methods=["GET"])
+@login_required_active
+def admin_panel():
+    return "<h1>Panel Admin OK</h1>", 200
