@@ -190,7 +190,7 @@
       ordBody.innerHTML = ords.map(o => `
         <tr>
           <td>${o.order_id.slice(0, 8)}…</td>
-          <td>${o.user_id}</td>
+          <td>${o.username}</td>          <!-- ahora mostramos el username -->
           <td>$${o.total}</td>
           <td>${o.items.length}</td>
         </tr>`).join('');
