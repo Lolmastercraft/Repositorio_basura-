@@ -27,7 +27,7 @@
     import { API }   from './js/api.js';
     import { toast } from './js/toast.js';
 
-    /* ——— Protección ——— */
+    // ————————— Protección y rol —————————
     const me = await API.me();
     if (!me.user_id && !me.is_admin) {
       toast('Debes iniciar sesión', true);
@@ -57,6 +57,7 @@
     }
 
     async function eliminar(e) {
+      // Al eliminar no se diferencia admin/usuario, pero se podría bloquear aquí también
       const id  = e.target.closest('.vinyl-item').dataset.id;
       const res = await API.removeFromCart(id);
       toast(res.message || res.error, !!res.error);
@@ -64,6 +65,12 @@
     }
 
     buyBtn.addEventListener('click', async () => {
+      // ——— Bloqueo para admin ———
+      if (me.is_admin) {
+        toast('Como administrador no puedes comprar', true);
+        return;
+      }
+      // Acción normal
       const res = await API.checkout();
       toast(res.message || res.error, !!res.error);
       if (!res.error) loadCart();
